@@ -1,8 +1,13 @@
 {
   "name": "rom-mcp",
-  "version": "1.1.0",
-  "description": "MCP server for searching, verifying, and managing game ROM collections. Search Internet Archive, verify checksums, parse save files.",
+  "version": "1.1.1",
+  "description": "MCP server for searching, verifying, and managing game ROM collections. Search Internet Archive, ROMsgames, CoolROM, Arcade Punks, ROMsFun, Reddit r/Roms, verify checksums, parse save files.",
   "type": "module",
+  "mcpName": "io.github.mrfentmen/rom-mcp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mrfentmen/rom-mcp.git"
+  },
   "bin": {
     "rom-mcp": "./dist/index.js"
   },
