@@ -10,8 +10,59 @@ import {
   parseSaveFile,
   scanCollection,
   searchInternetArchive,
+  searchRomsGames,
+  searchCoolrom,
+  searchArcadePunks,
+  searchRomsFun,
+  searchRedditRoms,
+  searchAllSources,
   verifyChecksum,
 } from "./romdb.js"
+import type { RomSearchResult } from "./types.js"
+
+function formatResults(results: RomSearchResult[], query: string): string {
+  if (results.length === 0) return `No ROMs found for "${query}"`
+  const lines = results.map((r) => ({
+    title: r.title,
+    source: r.source,
+    link: r.link || `https://archive.org/details/${r.identifier}`,
+    size: r.size ? formatFileSize(r.size) : undefined,
+    creator: r.creator,
+    date: r.date,
+    downloads: r.downloads,
+  }))
+  return JSON.stringify(lines, null, 2)
+}
+
+async function handleSearchAll(query: string, consoleFilter: string | undefined) {
+  const results = await searchAllSources(query, consoleFilter)
+  return formatResults(results, query)
+}
+
+async function handleSearchRomsGames(query: string, consoleFilter: string | undefined) {
+  const results = await searchRomsGames(query, consoleFilter)
+  return formatResults(results, query)
+}
+
+async function handleSearchCoolrom(query: string) {
+  const results = await searchCoolrom(query)
+  return formatResults(results, query)
+}
+
+async function handleSearchArcadePunks(query: string) {
+  const results = await searchArcadePunks(query)
+  return formatResults(results, query)
+}
+
+async function handleSearchRomsFun(query: string, consoleFilter: string | undefined) {
+  const results = await searchRomsFun(query, consoleFilter)
+  return formatResults(results, query)
+}
+
+async function handleSearchRedditRoms(query: string, sort: string, time: string) {
+  const results = await searchRedditRoms(query, sort, time)
+  return formatResults(results, query)
+}
 
 async function handleSearch(query: string, maxResults: number) {
   const results = await searchInternetArchive(query, "software", maxResults)
@@ -96,7 +147,7 @@ async function handleDownload(identifier: string, filename: string, outputDir: s
 }
 
 export function createServer(): McpServer {
-  const server = new McpServer({ name: "rom-mcp", version: "1.0.0" })
+  const server = new McpServer({ name: "rom-mcp", version: "1.1.0" })
 
   server.tool(
     "search_rom",
@@ -206,6 +257,107 @@ export function createServer(): McpServer {
         return { content: [{ type: "text", text }] }
       } catch (err) {
         return { content: [{ type: "text", text: `Download error: ${(err as Error).message}` }] }
+      }
+    },
+  )
+
+  server.tool(
+    "search_all_sources",
+    "Search across all ROM sources: Internet Archive, ROMsgames.net, CoolROM, Arcade Punks, ROMsFun, and Reddit r/Roms.",
+    {
+      query: z.string().describe("Game title or keyword to search for"),
+      console_filter: z.string().optional().describe("Console type to filter by (e.g. 'nes', 'snes', 'gba')"),
+    },
+    async (args: any) => {
+      try {
+        const text = await handleSearchAll(args.query, args.console_filter)
+        return { content: [{ type: "text", text }] }
+      } catch (err) {
+        return { content: [{ type: "text", text: `Search error: ${(err as Error).message}` }] }
+      }
+    },
+  )
+
+  server.tool(
+    "search_romsgames",
+    "Search ROMsgames.net for game ROMs.",
+    {
+      query: z.string().describe("Game title or keyword to search for"),
+      console_filter: z.string().optional().describe("Console type to filter by"),
+    },
+    async (args: any) => {
+      try {
+        const text = await handleSearchRomsGames(args.query, args.console_filter)
+        return { content: [{ type: "text", text }] }
+      } catch (err) {
+        return { content: [{ type: "text", text: `Search error: ${(err as Error).message}` }] }
+      }
+    },
+  )
+
+  server.tool(
+    "search_coolrom",
+    "Search CoolROM for game ROMs.",
+    {
+      query: z.string().describe("Game title or keyword to search for"),
+    },
+    async (args: any) => {
+      try {
+        const text = await handleSearchCoolrom(args.query)
+        return { content: [{ type: "text", text }] }
+      } catch (err) {
+        return { content: [{ type: "text", text: `Search error: ${(err as Error).message}` }] }
+      }
+    },
+  )
+
+  server.tool(
+    "search_arcadepunks",
+    "Search Arcade Punks for ROMs and related content.",
+    {
+      query: z.string().describe("Game title or keyword to search for"),
+    },
+    async (args: any) => {
+      try {
+        const text = await handleSearchArcadePunks(args.query)
+        return { content: [{ type: "text", text }] }
+      } catch (err) {
+        return { content: [{ type: "text", text: `Search error: ${(err as Error).message}` }] }
+      }
+    },
+  )
+
+  server.tool(
+    "search_romsfun",
+    "Search ROMsFun for game ROMs.",
+    {
+      query: z.string().describe("Game title or keyword to search for"),
+      console_filter: z.string().optional().describe("Console type to filter by"),
+    },
+    async (args: any) => {
+      try {
+        const text = await handleSearchRomsFun(args.query, args.console_filter)
+        return { content: [{ type: "text", text }] }
+      } catch (err) {
+        return { content: [{ type: "text", text: `Search error: ${(err as Error).message}` }] }
+      }
+    },
+  )
+
+  server.tool(
+    "search_reddit_roms",
+    "Search Reddit r/Roms for community discussions and recommendations about ROMs.",
+    {
+      query: z.string().describe("Search term for Reddit r/Roms"),
+      sort: z.enum(["relevance", "new", "top", "comments"]).optional().describe("Sort order"),
+      time: z.enum(["hour", "day", "week", "month", "year", "all"]).optional().describe("Time filter"),
+    },
+    async (args: any) => {
+      try {
+        const text = await handleSearchRedditRoms(args.query, args.sort ?? "relevance", args.time ?? "all")
+        return { content: [{ type: "text", text }] }
+      } catch (err) {
+        return { content: [{ type: "text", text: `Search error: ${(err as Error).message}` }] }
       }
     },
   )

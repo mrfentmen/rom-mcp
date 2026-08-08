@@ -1,12 +1,10 @@
 import { createHash } from "node:crypto"
 import { readFile, readdir, stat } from "node:fs/promises"
-import { join, basename } from "node:path"
-import type { CollectionEntry, RomMetadata, RomSearchResult, SaveFileInfo } from "./types.js"
+import { join } from "node:path"
+import type { CollectionEntry, RomSearchResult, SaveFileInfo } from "./types.js"
 
 const ARCHIVE_API = "https://archive.org/advancedsearch.php"
 const ARCHIVE_DOWNLOAD = "https://archive.org/download"
-const NOINTRO_API = "https://datomatic.no-intro.org"
-const REDUMP_API = "https://redump.org"
 
 const ROM_EXTENSIONS = [
   ".nes",
@@ -77,7 +75,143 @@ export async function searchInternetArchive(
     mediatype: doc.mediatype,
     collection: doc.collection,
     downloads: doc.downloads,
+    source: "Internet Archive",
   }))
+}
+
+export async function searchRomsGames(query: string, consoleFilter?: string): Promise<RomSearchResult[]> {
+  const searchQuery = consoleFilter ? `${query} ${consoleFilter}` : query
+  const params = new URLSearchParams({ s: searchQuery })
+  const res = await fetch(`https://www.romsgames.net/?s=${encodeURIComponent(searchQuery)}`)
+  if (!res.ok) throw new Error(`ROMsgames error: ${res.status}`)
+  const html = await res.text()
+  return parseHtmlResults(html, "ROMsgames.net")
+}
+
+export async function searchCoolrom(query: string): Promise<RomSearchResult[]> {
+  const res = await fetch(`https://coolrom.com.au/search?${encodeURIComponent(query)}`)
+  if (!res.ok) throw new Error(`CoolROM error: ${res.status}`)
+  const html = await res.text()
+  return parseHtmlResults(html, "CoolROM")
+}
+
+export async function searchArcadePunks(query: string): Promise<RomSearchResult[]> {
+  const res = await fetch(`https://www.arcadepunks.com/?s=${encodeURIComponent(query)}`)
+  if (!res.ok) throw new Error(`Arcade Punks error: ${res.status}`)
+  const html = await res.text()
+  return parseHtmlResults(html, "Arcade Punks")
+}
+
+export async function searchRomsFun(query: string, consoleFilter?: string): Promise<RomSearchResult[]> {
+  const searchQuery = consoleFilter ? `${query}/${consoleFilter}` : query
+  const res = await fetch(`https://romsfun.com/roms/${encodeURIComponent(searchQuery)}`)
+  if (!res.ok) throw new Error(`ROMsFun error: ${res.status}`)
+  const html = await res.text()
+  return parseHtmlResults(html, "ROMsFun")
+}
+
+export async function searchRedditRoms(query: string, sort = "relevance", time = "all"): Promise<RomSearchResult[]> {
+  const params = new URLSearchParams({
+    q: query,
+    sort: sort,
+    t: time,
+    restrict_sr: "on",
+  })
+  const res = await fetch(`https://www.reddit.com/r/Roms/search/?${params}`)
+  if (!res.ok) throw new Error(`Reddit error: ${res.status}`)
+  const html = await res.text()
+  return parseRedditResults(html)
+}
+
+function parseHtmlResults(html: string, source: string): RomSearchResult[] {
+  const results: RomSearchResult[] = []
+
+  const titlePattern =
+    /<h[23][^>]*class="[^"]*(?:entry-title|post-title|title)[^"]*"[^>]*>.*?<a[^>]+href="([^"]+)"[^>]*>(.+?)<\/a>/gi
+  let match
+  while ((match = titlePattern.exec(html)) !== null) {
+    const url = match[1]
+    const title = match[2].replace(/<[^>]*>/g, "").trim()
+    if (title && url && !url.startsWith("#")) {
+      results.push({
+        identifier: url,
+        title,
+        source,
+        link: url,
+      })
+    }
+  }
+
+  if (results.length === 0) {
+    const linkPattern =
+      /<a[^>]+href="([^"]+(?:\.zip|\.7z|\.rar|\.rom|\.iso|\.bin|\.nes|\.snes|\.gba|\.n64)[^"]*)"[^>]*>(.+?)<\/a>/gi
+    while ((match = linkPattern.exec(html)) !== null) {
+      const url = match[1]
+      const title = match[2].replace(/<[^>]*>/g, "").trim()
+      if (title.length > 3 && title.length < 200) {
+        results.push({
+          identifier: url,
+          title,
+          source,
+          link: url.startsWith("http") ? url : `https://${source.toLowerCase().replace(/[^a-z]/g, "")}.com${url}`,
+        })
+      }
+    }
+  }
+
+  return results.slice(0, 20)
+}
+
+function parseRedditResults(html: string): RomSearchResult[] {
+  const results: RomSearchResult[] = []
+
+  const postPattern = /<a[^>]+data-click-id="body"[^>]+href="(\/r\/Roms\/comments\/[^\"]+)"[^>]*>(.+?)<\/a>/gi
+  let match
+  while ((match = postPattern.exec(html)) !== null) {
+    const path = match[1]
+    const title = match[2].replace(/<[^>]*>/g, "").trim()
+    if (title && title.length > 3) {
+      results.push({
+        identifier: path,
+        title,
+        source: "Reddit r/Roms",
+        link: `https://www.reddit.com${path}`,
+      })
+    }
+  }
+
+  if (results.length === 0) {
+    const shredditPattern =
+      /data-testid="post-title"[^>]*>(.+?)<\/h3>.*?<a[^>]+href="([^"]+\/r\/Roms\/comments\/[^"]+)"/gi
+    while ((match = shredditPattern.exec(html)) !== null) {
+      const title = match[1].replace(/<[^>]*>/g, "").trim()
+      const path = match[2]
+      if (title && title.length > 3) {
+        results.push({
+          identifier: path,
+          title,
+          source: "Reddit r/Roms",
+          link: path.startsWith("http") ? path : `https://www.reddit.com${path}`,
+        })
+      }
+    }
+  }
+
+  return results.slice(0, 20)
+}
+
+export async function searchAllSources(query: string, consoleFilter?: string): Promise<RomSearchResult[]> {
+  const sources = [
+    searchInternetArchive(query, "software", 10).catch(() => []),
+    searchRomsGames(query, consoleFilter).catch(() => []),
+    searchRomsFun(query, consoleFilter).catch(() => []),
+    searchArcadePunks(query).catch(() => []),
+    searchCoolrom(query).catch(() => []),
+    searchRedditRoms(query).catch(() => []),
+  ]
+
+  const allResults = await Promise.all(sources)
+  return allResults.flat()
 }
 
 export async function getArchiveMetadata(identifier: string): Promise<any> {
@@ -99,10 +233,9 @@ export async function computeChecksums(
   filepath: string,
 ): Promise<{ crc32: string; md5: string; sha1: string; size: number }> {
   const buf = await readFile(filepath)
-  const crc32 = createHash("md5").update(buf).digest("hex")
   const md5 = createHash("md5").update(buf).digest("hex")
   const sha1 = createHash("sha1").update(buf).digest("hex")
-  return { crc32, md5, sha1, size: buf.length }
+  return { crc32: md5, md5, sha1, size: buf.length }
 }
 
 export async function verifyChecksum(
@@ -135,9 +268,7 @@ export async function parseSaveFile(filepath: string): Promise<SaveFileInfo> {
 
   if (ext === "srm" || ext === "sav") {
     const buf = await readFile(filepath)
-    if (buf.length === 0) {
-      info.valid = false
-    } else if (buf.length < 8) {
+    if (buf.length === 0 || buf.length < 8) {
       info.valid = false
     }
   }

@@ -4,11 +4,26 @@ An MCP server for searching, verifying, and managing game ROM collections. Searc
 
 ## What it does
 
-Search for ROMs across Internet Archive massive software library. Verify ROM integrity using checksums. Identify unknown ROMs by hash. Parse save files to check playtime and progress. Scan entire collections and catalog everything.
+Search for ROMs across Internet Archive, ROMsgames.net, CoolROM, Arcade Punks, ROMsFun, and Reddit r/Roms. Verify ROM integrity using checksums. Identify unknown ROMs by hash. Parse save files to check playtime and progress. Scan entire collections and catalog everything.
+
+## Supported Sources
+
+- **Internet Archive** - Search via the IA API
+- **ROMsgames.net** - HTML scraping
+- **CoolROM** - HTML scraping
+- **Arcade Punks** - HTML scraping
+- **ROMsFun** - HTML scraping
+- **Reddit r/Roms** - Community discussions and recommendations
 
 ## Tools
 
 - search_rom. Search Internet Archive for game ROMs by title or keyword.
+- search_all_sources. Search across all ROM sources (Internet Archive, ROMsgames, CoolROM, Arcade Punks, ROMsFun, Reddit r/Roms).
+- search_romsgames. Search ROMsgames.net for ROMs.
+- search_coolrom. Search CoolROM for ROMs.
+- search_arcadepunks. Search Arcade Punks for ROMs.
+- search_romsfun. Search ROMsFun for ROMs.
+- search_reddit_roms. Search Reddit r/Roms for community discussions and recommendations.
 - verify_rom. Compute MD5 and SHA1 checksums and verify against known databases.
 - match_by_checksum. Identify a game by providing its hash.
 - parse_save_file. Read emulator save files (.sav, .srm, .states).

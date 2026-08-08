@@ -9,6 +9,8 @@ export interface RomSearchResult {
   mediatype?: string
   collection?: string[]
   downloads?: number
+  source: string
+  link?: string
 }
 
 export interface RomMetadata {
